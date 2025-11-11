@@ -6,6 +6,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0]
+
+### Added
+
+-   Support for performing in-silico mutagenesis (ISM) on the alternate allele.
+    This enables the reproduction of e.g.
+    [Figure 4b in our pre-print](https://doi.org/10.1101/2025.06.25.661532).
+-   Add missing extended columns when calling `tidy_anndata`.
+
+### Removed
+
+-   Remove support for 2kb DNA sequence lengths. This is due to AlphaGenome not
+    performing well with very short sequence lengths (see
+    [Figure 7 of our pre-print](https://doi.org/10.1101/2025.06.25.661532) for
+    details).
+
 ## [0.4.0]
 
 ### Added

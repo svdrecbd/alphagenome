@@ -109,8 +109,8 @@ aggregation can be applied.
 
 Suggestions include additional aggregation (mean, max, sum, etc.) over:
 
-*   All tracks
-*   Subsets of tracks
+*   All tracks.
+*   Subsets of tracks.
 
 Or, a single track of interest can be chosen, i.e., from a particular sample.
 
@@ -134,10 +134,10 @@ diverse genomic modalities as outlined below:
 
 Variant scores quantify the impact on overall gene transcript abundance.
 
-*   comparison: predicted RNA coverage between `REF` and `ALT` alleles
-*   mask: exons for a gene of interest
+*   comparison: predicted RNA coverage between `REF` and `ALT` alleles.
+*   mask: exons for a gene of interest.
 *   aggregation: Log-fold change of gene expression level between the `ALT` and
-    `REF` alleles: {math}`\log(mean(ALT) + 0.001) - log(mean(REF) + 0.001)`
+    `REF` alleles: {math}`\log(mean(ALT) + 0.001) - log(mean(REF) + 0.001)`.
 
 ### Polyadenylation Site (PAS) Usage
 
@@ -145,8 +145,8 @@ This follows Borzoi's {cite:p}`borzoi` methodology for scoring polyadenylation
 quantitative trait loci (paQTLs), which captures the variant's impact on RNA
 isoform production.
 
-*   comparison: predicted RNA coverage between `REF` and `ALT` alleles
-*   mask: local 400-bp windows around 3' cleavage junctions
+*   comparison: predicted RNA coverage between `REF` and `ALT` alleles.
+*   mask: local 400-bp windows around 3' cleavage junctions.
 *   aggregation: Maximum absolute log-fold change of isoform ratios
     (distal/proximal PAS usage) between `REF` and `ALT`, considering all
     proximal/distal splits.
@@ -156,58 +156,58 @@ isoform production.
 Variant scores quantify local changes at TSSs.
 
 *   comparison: predicted CAGE or PRO-cap coverage between `REF` and `ALT`
-    alleles
-*   mask: local 501-bp window centered at the variant
+    alleles.
+*   mask: local 501-bp window centered at the variant.
 *   aggregation: Log2-ratio of summed signals: {math}`log2[(sum(ALT) + 1) /
-    (sum(REF) + 1)]`
+    (sum(REF) + 1)]`.
 
 ### Chromatin Accessibility (ATAC-seq, DNase-seq)
 
 Variant scores quantify local accessibility changes.
 
 *   comparison: predicted ATAC-seq or DNase-cap coverage between `REF` and `ALT`
-    alleles
-*   mask: local 501-bp window centered at the variant
+    alleles.
+*   mask: local 501-bp window centered at the variant.
 *   aggregation: Log2-ratio of summed signals: {math}`log2[(sum(ALT) + 1) /
-    (sum(REF) + 1)]`
+    (sum(REF) + 1)]`.
 
 ### Transcription Factor Binding (ChIP-TF)
 
 Variant scores quantify changes in TF binding intensity.
 
-*   comparison: predicted ChIP-TF coverage between `REF` and `ALT` alleles
-*   mask: local 501-bp window centered at the variant
+*   comparison: predicted ChIP-TF coverage between `REF` and `ALT` alleles.
+*   mask: local 501-bp window centered at the variant.
 *   aggregation: Log2-ratio of summed signals: {math}`log2[(sum(ALT) + 1) /
-    (sum(REF) + 1)]`
+    (sum(REF) + 1)]`.
 
 ### Histone Modifications (ChIP-Histone)
 
 Variant scores quantify changes in histone modifications.
 
-*   comparison: predicted ChIP-Histone coverage between `REF` and `ALT` alleles
-*   mask: local 2001-bp window centered at the variant
+*   comparison: predicted ChIP-Histone coverage between `REF` and `ALT` alleles.
+*   mask: local 2001-bp window centered at the variant.
 *   aggregation: Log2-ratio of summed signals: {math}`log2[(sum(ALT) + 1) /
-    (sum(REF) + 1)]`
+    (sum(REF) + 1)]`.
 
 ### Splicing (Splice Sites)
 
 Variant scores quantify changes in the class assignment probabilities (acceptor,
 donor) at all potential splice sites within a gene body.
 
-*   comparison: class assignment probabilities for `REF` and `ALT` alleles
-*   mask: gene body for a gene of interest
+*   comparison: class assignment probabilities for `REF` and `ALT` alleles.
+*   mask: gene body for a gene of interest.
 *   aggregation: Maximum absolute difference of predicted splice site
-    probabilities across the gene body: {math}`max(|ALT - REF|)`
+    probabilities across the gene body: {math}`max(|ALT - REF|)`.
 
 ### Splicing (Splice Site Usage)
 
 Variant scores quantify changes in the usage of splice sites (i.e., increased or
 decreased fractions).
 
-*   comparison: predicted splice site usage between `REF` and `ALT` alleles
-*   mask: gene body for a gene of interest
+*   comparison: predicted splice site usage between `REF` and `ALT` alleles.
+*   mask: gene body for a gene of interest.
 *   aggregation: Maximum absolute difference of predicted splice site usage
-    across the gene body: {math}`max(|ALT - REF|)`
+    across the gene body: {math}`max(|ALT - REF|)`.
 
 ### Splicing (Splice Junctions)
 
@@ -215,18 +215,19 @@ Variant scores quantify changes in the predicted RNA-seq reads spanning a
 junction, which is a function of both expression level, splice site usage and
 splicing efficiency.
 
-*   comparison: predicted paired junction counts between `REF` and `ALT` alleles
+*   comparison: predicted paired junction counts between `REF` and `ALT`
+    alleles.
 *   mask: top-k splice sites for a gene of interest (including annotated and
-    predicted splice sites)
+    predicted splice sites).
 *   aggregation: Maximum absolute log-fold change of predicted junction counts
-    across splice site pairs of interest: {math}`max(|log(ALT) - log(REF)|)`
+    across splice site pairs of interest: {math}`max(|log(ALT) - log(REF)|)`.
 
 ### 3D Genome Contact (Contact Maps)
 
 Variant scores quantify local contact disruption.
 
-*   comparison: predicted contact frequencies between `REF` and `ALT` alleles
-*   mask: local 1MB window centered at the variant
+*   comparison: predicted contact frequencies between `REF` and `ALT` alleles.
+*   mask: local 1MB window centered at the variant.
 *   aggregation: Mean absolute difference of contact frequencies, for all
     interactions involving the variant-containing bin.
 
@@ -241,15 +242,15 @@ calculated by taking the maximum of the aggregated signals from the `REF` and
 We provide recommended active allele scorers for the following modalities:
 
 *   Gene expression (RNA-seq): {math}`max(mean(ALT), mean(REF))` across exons
-    for a gene of interest
+    for a gene of interest.
 *   TSS activity (CAGE, PRO-cap): {math}`max(sum(ALT), sum(REF))` within a local
-    501-bp window centered at the variant
+    501-bp window centered at the variant.
 *   Chromatin Accessibility (ATAC-seq, DNase-seq): {math}`max(sum(ALT),
-    sum(REF))` within a local 501-bp window centered at the variant
+    sum(REF))` within a local 501-bp window centered at the variant.
 *   Transcription Factor binding (ChIP-TF): {math}`max(sum(ALT), sum(REF))`
-    within a local 501-bp window centered at the variant
+    within a local 501-bp window centered at the variant.
 *   Histone modifications (ChIP-Histone): {math}`max(sum(ALT), sum(REF))` within
-    a local 2001-bp window centered at the variant
+    a local 2001-bp window centered at the variant.
 
 ## Available variant scorers
 

@@ -41,6 +41,11 @@ class Organism(enum.Enum):
   def to_proto(self) -> dna_model_pb2.Organism:
     return self.value
 
+  def __lt__(self, other: 'Organism') -> bool:
+    if not isinstance(other, Organism):
+      return NotImplemented
+    return self.value < other.value
+
 
 class DnaModel(metaclass=abc.ABCMeta):
   """Abstract base class for AlphaGenome DNA models."""

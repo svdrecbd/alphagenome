@@ -161,9 +161,8 @@ class PlotComponentsTest(parameterized.TestCase):
             reference_bases='A',
             alternate_bases='G',
         )
-        for pos in (
-            subinterval.start
-            + subinterval.width / np.array([2, 3, 10], dtype=np.float32)
+        for pos in subinterval.start + subinterval.width / np.array(
+            [2, 3, 10], dtype=np.float32
         )
     ]
 

@@ -14,7 +14,6 @@
 
 """Module containing interval scorer dataclasses for interval scoring."""
 
-
 import dataclasses
 import enum
 from typing import TypeVar

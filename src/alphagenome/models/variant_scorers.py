@@ -14,7 +14,6 @@
 
 """Module containing variant scorer dataclasses for variant scoring."""
 
-
 from collections.abc import Sequence
 import dataclasses
 import enum

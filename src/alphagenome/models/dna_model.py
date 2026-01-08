@@ -473,6 +473,7 @@ class DnaModel(metaclass=abc.ABCMeta):
       ism_interval: genome.Interval,
       variant_scorers: Sequence[variant_scorers_lib.VariantScorerTypes] = (),
       *,
+      interval_variant: genome.Variant | None = None,
       organism: Organism = Organism.HOMO_SAPIENS,
   ) -> list[list[anndata.AnnData]]:
     """Generate in-silico mutagenesis (ISM) variant scores for a given interval.
@@ -483,6 +484,9 @@ class DnaModel(metaclass=abc.ABCMeta):
       variant_scorers: Sequence of variant scorers to use for scoring each
         variant. If no variant scorers are provided, the recommended variant
         scorers for the organism will be used.
+      interval_variant: Optional variant to apply to the sequence. If provided,
+        the alternate allele is used for in-silico mutagenesis, otherwise the
+        unaltered reference sequence is used.
       organism: Organism to use for the prediction.
 
     Returns:

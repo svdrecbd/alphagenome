@@ -151,6 +151,7 @@ class _MockDnaModel(dna_model.DnaModel):
       variant_scorers: Sequence[variant_scorers_lib.VariantScorerTypes] = (),
       *,
       organism: dna_model.Organism = dna_model.Organism.HOMO_SAPIENS,
+      interval_variant: genome.Variant | None = None,
   ) -> list[list[anndata.AnnData]]:
     if self._score_ism_variants_callable is None:
       raise NotImplementedError('score_ism_variants is not implemented.')
@@ -159,6 +160,7 @@ class _MockDnaModel(dna_model.DnaModel):
         ism_interval,
         variant_scorers=variant_scorers,
         organism=organism,
+        interval_variant=interval_variant,
     )
 
 

@@ -480,14 +480,20 @@ class Transcript:
     transcript_df = transcript_df.sort_values(by='Start')
     intervals_per_feature = collections.defaultdict(list)
     exon_row = None
-    for _, row in transcript_df.iterrows():
+    for row in transcript_df.itertuples():
+      row_dict = row._asdict()
+      # itertuples includes the index as the first element if not named,
+      # or as 'Index' if index=True (default). We need to adapt from_pyranges_dict
+      # or just construct manually. from_pyranges_dict expects a mapping.
+      # row._asdict() gives us what we need.
+      
       interval = genome.Interval.from_pyranges_dict(
-          row, ignore_info=True
-      )  # pytype: disable=wrong-arg-types  # pandas-drop-duplicates-overloads
+          row_dict, ignore_info=True
+      )
       if row.Feature in ['CDS', 'stop_codon']:
         interval.info['frame'] = int(row.Frame)
       if exon_row is None and row.Feature == 'exon':
-        exon_row = row
+        exon_row = row_dict
       intervals_per_feature[row.Feature].append(interval)
 
     if exon_row is None:
@@ -497,11 +503,13 @@ class Transcript:
     if ignore_info:
       info = {}
     else:
+      # Filter out the Index field if present
       skip = list(genome.PYRANGES_INTERVAL_COLUMNS) + [
           'Feature',
           'transcript_type',
           'Selenocysteines',
           'gene_type',
+          'Index' 
       ]
       info = {k: v for k, v in exon_row.items() if k not in skip}
 

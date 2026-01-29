@@ -40,23 +40,19 @@ def ism_variants(
   """
   if len(sequence) != interval.width:
     raise ValueError('Sequence must have the same length as interval.')
-  variants = []
-  for position in range(interval.width):
-    reference_base = sequence[position]
-    if skip_n and reference_base == 'N':
-      continue
-    for alternative_base in vocabulary:
-      if reference_base == alternative_base:
-        continue
-      variants.append(
-          genome.Variant(
-              chromosome=interval.chromosome,
-              reference_bases=reference_base,
-              alternate_bases=alternative_base,
-              position=interval.start + position + 1,
-          )
+
+  return [
+      genome.Variant(
+          chromosome=interval.chromosome,
+          reference_bases=reference_base,
+          alternate_bases=alternative_base,
+          position=interval.start + position + 1,
       )
-  return variants
+      for position, reference_base in enumerate(sequence)
+      if not (skip_n and reference_base == 'N')
+      for alternative_base in vocabulary
+      if reference_base != alternative_base
+  ]
 
 
 def ism_matrix(
@@ -106,15 +102,26 @@ def ism_matrix(
   filled = np.zeros((interval.width, 4), dtype=bool)
   base_index = {base: i for i, base in enumerate(vocabulary)}
 
+  positions = []
+  col_indices = []
+  vals = []
+
+  interval_start = interval.start
+  interval_end = interval.end
+
   for variant, score in zip(variants, variant_scores, strict=True):
-    if len(variant.alternate_bases) != 1 or len(variant.reference_bases) != 1:
-      # Only looking for single nucleotide variants.
-      continue
-    if not interval.contains(variant.reference_interval):
-      continue
-    position = variant.start - interval.start
-    scores[position, base_index[variant.alternate_bases]] = score
-    filled[position, base_index[variant.alternate_bases]] = True
+    # Inlined checks for speed.
+    if len(variant.alternate_bases) == 1 and len(variant.reference_bases) == 1:
+      # contains check:
+      v_start = variant.start
+      if v_start >= interval_start and (v_start + 1) <= interval_end:
+        positions.append(v_start - interval_start)
+        col_indices.append(base_index[variant.alternate_bases])
+        vals.append(score)
+
+  if positions:
+    scores[positions, col_indices] = vals
+    filled[positions, col_indices] = True
 
   # Check that all positions were covered by variants.
   if (filled.sum(axis=-1) == 0).any() and require_fully_filled:

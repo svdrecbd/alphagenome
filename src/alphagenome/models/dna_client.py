@@ -513,6 +513,7 @@ class DnaClient(dna_model.DnaModel):
     self._model_version = (
         model_version.name if model_version is not None else None
     )
+    self._stub = dna_model_service_pb2_grpc.DnaModelServiceStub(channel)
 
   @retry_rpc
   def predict_sequence(
@@ -539,14 +540,15 @@ class DnaClient(dna_model.DnaModel):
     Returns:
       Output for the provided DNA sequence.
     """
-    if not (unique_values := set(sequence)).issubset(
-        _VALID_SEQUENCE_CHARACTERS
-    ):
-      invalid_characters = ','.join(unique_values - _VALID_SEQUENCE_CHARACTERS)
-      raise ValueError(
-          'Invalid sequence, must only contain the characters "ACGTN". Found'
-          f' invalid characters: "{invalid_characters}"'
-      )
+    # Optimized check to fail fast without allocating a set unless an error is found
+    for char in sequence:
+      if char not in _VALID_SEQUENCE_CHARACTERS:
+        unique_values = set(sequence)
+        invalid_characters = ','.join(sorted(unique_values - _VALID_SEQUENCE_CHARACTERS))
+        raise ValueError(
+            'Invalid sequence, must only contain the characters "ACGTN". Found'
+            f' invalid characters: "{invalid_characters}"'
+        )
     validate_sequence_length(len(sequence))
     requested_outputs = [o.to_proto() for o in dict.fromkeys(requested_outputs)]
     request = dna_model_service_pb2.PredictSequenceRequest(
@@ -556,9 +558,7 @@ class DnaClient(dna_model.DnaModel):
         requested_outputs=requested_outputs,
         model_version=self._model_version,
     )
-    responses = dna_model_service_pb2_grpc.DnaModelServiceStub(
-        self._channel
-    ).PredictSequence(iter([request]), metadata=self._metadata)
+    responses = self._stub.PredictSequence(iter([request]), metadata=self._metadata)
     return _make_output(responses, interval=interval)
 
   @retry_rpc
@@ -592,9 +592,7 @@ class DnaClient(dna_model.DnaModel):
         requested_outputs=requested_outputs,
         model_version=self._model_version,
     )
-    responses = dna_model_service_pb2_grpc.DnaModelServiceStub(
-        self._channel
-    ).PredictInterval(iter([request]), metadata=self._metadata)
+    responses = self._stub.PredictInterval(iter([request]), metadata=self._metadata)
     return _make_output(responses)
 
   @retry_rpc
@@ -631,9 +629,7 @@ class DnaClient(dna_model.DnaModel):
         requested_outputs=requested_outputs,
         model_version=self._model_version,
     )
-    responses = dna_model_service_pb2_grpc.DnaModelServiceStub(
-        self._channel
-    ).PredictVariant(iter([request]), metadata=self._metadata)
+    responses = self._stub.PredictVariant(iter([request]), metadata=self._metadata)
     return _make_variant_output(responses)
 
   @retry_rpc
@@ -682,9 +678,7 @@ class DnaClient(dna_model.DnaModel):
         organism=organism.to_proto(),
         model_version=self._model_version,
     )
-    responses = dna_model_service_pb2_grpc.DnaModelServiceStub(
-        self._channel
-    ).ScoreInterval(iter([request]), metadata=self._metadata)
+    responses = self._stub.ScoreInterval(iter([request]), metadata=self._metadata)
     interval_outputs = _make_interval_output(responses, interval)
     for ix in range(len(interval_scorers)):
       interval_outputs[ix].uns['interval_scorer'] = interval_scorers[ix]
@@ -748,9 +742,7 @@ class DnaClient(dna_model.DnaModel):
         variant_scorers=[vs.to_proto() for vs in variant_scorers],
         model_version=self._model_version,
     )
-    responses = dna_model_service_pb2_grpc.DnaModelServiceStub(
-        self._channel
-    ).ScoreVariant(iter([request]), metadata=self._metadata)
+    responses = self._stub.ScoreVariant(iter([request]), metadata=self._metadata)
     variant_outputs = _make_score_variant_output(responses, interval)
     for ix in range(len(variant_scorers)):
       variant_outputs[ix].uns['variant_scorer'] = variant_scorers[ix]
@@ -794,6 +786,14 @@ class DnaClient(dna_model.DnaModel):
     if ism_interval.negative_strand:
       raise ValueError('ISM interval must be on the positive strand.')
 
+    # Hoist constant proto conversions out of the loop
+    interval_proto = interval.to_proto()
+    organism_proto = organism.to_proto()
+    variant_scorers_protos = [vs.to_proto() for vs in variant_scorers]
+    interval_variant_proto = (
+        interval_variant.to_proto() if interval_variant is not None else None
+    )
+
     ism_intervals = []
     for position in range(0, ism_interval.width, MAX_ISM_INTERVAL_WIDTH):
       ism_intervals.append(
@@ -809,38 +809,34 @@ class DnaClient(dna_model.DnaModel):
 
     @retry_rpc
     def _score_ism_variant(
-        ism_interval: genome.Interval,
+        sub_ism_interval: genome.Interval,
     ) -> list[anndata.AnnData]:
       request = dna_model_service_pb2.ScoreIsmVariantRequest(
-          interval=interval.to_proto(),
-          ism_interval=ism_interval.to_proto(),
-          organism=organism.to_proto(),
-          variant_scorers=[vs.to_proto() for vs in variant_scorers],
+          interval=interval_proto,
+          ism_interval=sub_ism_interval.to_proto(),
+          organism=organism_proto,
+          variant_scorers=variant_scorers_protos,
           model_version=self._model_version,
-          interval_variant=interval_variant.to_proto()
-          if interval_variant is not None
-          else None,
+          interval_variant=interval_variant_proto,
       )
-      responses = dna_model_service_pb2_grpc.DnaModelServiceStub(
-          self._channel
-      ).ScoreIsmVariant(iter([request]), metadata=self._metadata)
+      responses = self._stub.ScoreIsmVariant(iter([request]), metadata=self._metadata)
 
       return _make_score_variant_output(responses, interval)
 
     with concurrent.futures.ThreadPoolExecutor(
         max_workers=max_workers
     ) as executor:
-      futures = [
-          executor.submit(_score_ism_variant, ism_interval)
-          for ism_interval in ism_intervals
-      ]
+      # Use executor.map for bounded concurrency and simplified results collection
+      results_iterator = executor.map(_score_ism_variant, ism_intervals)
+      
+      if progress_bar:
+        results_iterator = tqdm.auto.tqdm(
+            results_iterator, total=len(ism_intervals)
+        )
+      
       ism_scores = []
-      for future in tqdm.auto.tqdm(
-          concurrent.futures.as_completed(futures),
-          total=len(futures),
-          disable=not progress_bar,
-      ):
-        ism_scores.extend(future.result())
+      for result in results_iterator:
+        ism_scores.extend(result)
 
     # Group scores by variant.
     ism_scores_by_variant: dict[str, list[anndata.AnnData]] = {}

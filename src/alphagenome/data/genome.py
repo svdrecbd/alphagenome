@@ -504,13 +504,28 @@ class Interval:
           f'interval width {self.width} needs to be divisible '
           f'by bin_size {bin_size}.'
       )
-    output = np.zeros((self.width,), dtype=np.int32)
+
+    # Use a vectorized sweep-line approach.
+    # 1. Collect start/end points relative to self.start
+    starts = []
+    ends = []
     for interval in intervals:
       if not self.overlaps(interval):
         continue
-      relative_start = max(interval.start - self.start, 0)
-      relative_end = min(interval.end - self.start, self.width)
-      output[relative_start:relative_end] += 1
+      starts.append(max(interval.start - self.start, 0))
+      ends.append(min(interval.end - self.start, self.width))
+
+    if not starts:
+      return np.zeros(self.width // bin_size, dtype=np.int32)
+
+    # 2. Use a delta array to record starts (+1) and ends (-1)
+    deltas = np.zeros(self.width + 1, dtype=np.int32)
+    np.add.at(deltas, starts, 1)
+    np.add.at(deltas, ends, -1)
+
+    # 3. Cumsum gives the coverage at each position
+    output = np.cumsum(deltas)[:-1].astype(np.int32)
+
     if bin_size > 1:
       return output.reshape((self.width // bin_size, bin_size)).sum(axis=-1)
     else:

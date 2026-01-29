@@ -55,13 +55,16 @@ def _compress_bytes(
       return bytes(array.data)
 
 
+_DECOMPRESSOR = zstandard.ZstdDecompressor()
+
+
 def _decompress_bytes(
     data: bytes, compression_type: tensor_pb2.CompressionType
 ):
   """Decompress bytes using the specified compression type."""
   match compression_type:
     case tensor_pb2.CompressionType.COMPRESSION_TYPE_ZSTD:
-      return zstandard.decompress(data)
+      return _DECOMPRESSOR.decompress(data)
     case tensor_pb2.CompressionType.COMPRESSION_TYPE_NONE:
       return data
 
@@ -100,12 +103,27 @@ def pack_tensor(
     items_per_chunk = bytes_per_chunk // value.itemsize
     if bytes_per_chunk < value.itemsize:
       raise ValueError(f'{bytes_per_chunk=} must be >= {value.itemsize=}.')
+
+    # Reuse compressor context
+    compressor = (
+        zstandard.ZstdCompressor()
+        if compression_type == tensor_pb2.CompressionType.COMPRESSION_TYPE_ZSTD
+        else None
+    )
+
+    def _compress(chunk_array):
+      assert chunk_array.flags.c_contiguous
+      raw_bytes = chunk_array.view(np.uint8).data
+      if compression_type == tensor_pb2.CompressionType.COMPRESSION_TYPE_ZSTD:
+        return compressor.compress(raw_bytes)
+      return bytes(raw_bytes)
+
     for chunk in np.split(
         value.ravel(), range(items_per_chunk, value.size, items_per_chunk)
     ):
       chunks.append(
           tensor_pb2.TensorChunk(
-              data=_compress_bytes(chunk, compression_type),
+              data=_compress(chunk),
               compression_type=compression_type,
           )
       )
@@ -130,23 +148,36 @@ def unpack_proto(
   Returns:
     NumPy array of the unpacked data.
   """
+  dtype = _TENSOR_DTYPE_TO_NUMPY_DTYPE[proto.data_type]
   match proto.WhichOneof('payload'):
     case 'array':
       data = _decompress_bytes(proto.array.data, proto.array.compression_type)
+      return np.frombuffer(data, dtype=dtype).reshape(proto.shape)
     case 'chunk_count':
-      data = b''.join([
-          _decompress_bytes(chunk.data, chunk.compression_type)
-          for chunk in chunks
-      ])
+      # Optimized path: avoid b"".join to save memory.
+      # Pre-allocate full array and fill chunks.
+      array = np.empty(proto.shape, dtype=dtype)
+      flat_view = array.ravel()
+      offset = 0
+      for chunk in chunks:
+        decompressed = _decompress_bytes(
+            chunk.data, chunk.compression_type
+        )
+        # Wrap bytes in an array and copy into the slice
+        chunk_array = np.frombuffer(decompressed, dtype=dtype)
+        num_items = chunk_array.size
+        flat_view[offset : offset + num_items] = chunk_array
+        offset += num_items
+      
+      if offset != array.size:
+        raise ValueError(
+            f'cannot reshape array of size {offset} into shape ({proto.shape[0]},)'
+        )
+      return array
     case _:
       raise ValueError(
           f'Unsupported payload type: {proto.WhichOneof("payload")}'
       )
-
-  array = np.frombuffer(
-      data, dtype=_TENSOR_DTYPE_TO_NUMPY_DTYPE[proto.data_type]
-  ).reshape(proto.shape)
-  return array
 
 
 def upcast_floating(x: np.ndarray) -> np.ndarray:
